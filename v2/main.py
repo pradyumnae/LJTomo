@@ -16,6 +16,30 @@ import tqdm
 from dataset import TomographyH5Dataset
 from model import ViTEncoder, SIGReg
 
+class FastForwardSampler(DistributedSampler):
+    def __init__(self, dataset, num_replicas=None, rank=None, shuffle=True, seed=0, drop_last=False, start_epoch=0, start_step=0, batch_size=1):
+        super().__init__(dataset, num_replicas=num_replicas, rank=rank, shuffle=shuffle, seed=seed, drop_last=drop_last)
+        self.start_epoch = start_epoch
+        self.start_step = start_step
+        self.batch_size = batch_size
+        self.epoch = 0
+
+    def set_epoch(self, epoch):
+        super().set_epoch(epoch)
+        self.epoch = epoch
+
+    def __iter__(self):
+        indices = list(super().__iter__())
+        if self.epoch == self.start_epoch:
+            skip_indices = self.start_step * self.batch_size
+            indices = indices[skip_indices:]
+        return iter(indices)
+
+    def __len__(self):
+        if self.epoch == self.start_epoch:
+            return max(0, self.num_samples - self.start_step * self.batch_size) // self.batch_size
+        return self.num_samples // self.batch_size
+
 @hydra.main(version_base=None, config_name="config")
 def main(cfg: DictConfig):
     # Initialize DDP
@@ -52,11 +76,8 @@ def main(cfg: DictConfig):
         V=cfg.V, vmin=cfg.vmin, vmax=cfg.vmax, is_train=True
     )
     
-    sampler = DistributedSampler(train_ds, shuffle=True)
-    train = DataLoader(
-        train_ds, batch_size=cfg.bs, sampler=sampler, drop_last=True, 
-        num_workers=cfg.num_workers, pin_memory=True, persistent_workers=True
-    )
+    # Pre-calculate steps per epoch
+    steps_per_epoch = len(train_ds) // (cfg.bs * world_size)
 
     net = ViTEncoder(proj_dim=cfg.proj_dim, img_size=cfg.img_size, in_chans=1).to("cuda")
     scaler = GradScaler(enabled=torch.cuda.is_available())
@@ -64,6 +85,11 @@ def main(cfg: DictConfig):
     # Auto-resume logic (Load BEFORE compile/DDP to avoid key mismatches)
     os.makedirs("checkpoints", exist_ok=True)
     ckpt_files = [f for f in os.listdir("checkpoints") if f.endswith(".pth") and (f.startswith("lejepa_epoch_") or f.startswith("lejepa_step_"))]
+    
+    start_epoch = 0
+    start_step = 0
+    checkpoint = None
+    
     if ckpt_files:
         ckpt_files.sort(key=lambda x: os.path.getmtime(os.path.join("checkpoints", x)))
         latest_ckpt = ckpt_files[-1]
@@ -81,10 +107,14 @@ def main(cfg: DictConfig):
             new_state_dict[name] = v
             
         net.load_state_dict(new_state_dict)
-        # We will load optimizer/scheduler/start_epoch later after they are initialized
-    else:
-        checkpoint = None
-
+        
+        start_epoch = checkpoint['epoch']
+        start_step = checkpoint.get('step', -1) + 1 # -1 if epoch checkpoint, starts step 0 of next epoch
+        if start_step == 0:
+            start_epoch += 1 # It was an epoch checkpoint
+        if global_rank == 0:
+            print(f"Resuming from epoch {start_epoch}, step {start_step}", flush=True)
+            
     net = torch.compile(net) # Compile entire backbone for 20-30% speedup
     net = DDP(net, device_ids=[local_rank], find_unused_parameters=False)
     
@@ -96,24 +126,25 @@ def main(cfg: DictConfig):
     g2 = {"params": probe.parameters(), "lr": 1e-3, "weight_decay": 1e-7}
     opt = torch.optim.AdamW([g1, g2])
     
-    warmup_steps = len(train)
-    total_steps = len(train) * cfg.epochs
+    warmup_steps = steps_per_epoch
+    total_steps = steps_per_epoch * cfg.epochs
     s1 = LinearLR(opt, start_factor=0.01, total_iters=max(1, warmup_steps))
     s2 = CosineAnnealingLR(opt, T_max=max(1, total_steps - warmup_steps), eta_min=1e-3)
     scheduler = SequentialLR(opt, schedulers=[s1, s2], milestones=[warmup_steps])
     
-    start_epoch = 0
-    start_step = 0
     if checkpoint is not None:
         opt.load_state_dict(checkpoint['optimizer_state_dict'])
         if 'scheduler_state_dict' in checkpoint:
             scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
-        start_epoch = checkpoint['epoch']
-        start_step = checkpoint.get('step', -1) + 1 # -1 if epoch checkpoint, starts step 0 of next epoch
-        if start_step == 0:
-            start_epoch += 1 # It was an epoch checkpoint
-        if global_rank == 0:
-            print(f"Resuming from epoch {start_epoch}, step {start_step}", flush=True)
+
+    # Instantiate optimized FastForwardSampler and DataLoader
+    sampler = FastForwardSampler(
+        train_ds, shuffle=True, start_epoch=start_epoch, start_step=start_step, batch_size=cfg.bs
+    )
+    train = DataLoader(
+        train_ds, batch_size=cfg.bs, sampler=sampler, drop_last=True, 
+        num_workers=cfg.num_workers, pin_memory=True, persistent_workers=True
+    )
 
     # Training Loop
     print(f"Starting distributed training on {len(train_ds)} slices...", flush=True)
@@ -125,11 +156,11 @@ def main(cfg: DictConfig):
         pbar = tqdm.tqdm(train, total=len(train)) if global_rank == 0 else train
         
         for i, (vs, y) in enumerate(pbar):
-            if epoch == start_epoch and i < start_step:
-                continue # Fast-forward to resume step
-                
-            if global_rank == 0 and i == start_step:
-                print(f"Successfully started Batch {i} of Epoch {epoch}", flush=True)
+            # i counts from 0, but the sampler has already skipped the first start_step batches!
+            true_i = i + start_step if epoch == start_epoch else i
+            
+            if global_rank == 0 and i == 0:
+                print(f"Successfully started Batch {true_i} of Epoch {epoch}", flush=True)
             
             vs = vs.to("cuda", non_blocking=True)
             y = y.to("cuda", non_blocking=True)
@@ -149,7 +180,7 @@ def main(cfg: DictConfig):
             scaler.update()
             scheduler.step()
             
-            global_step = epoch * len(train) + i
+            global_step = epoch * steps_per_epoch + true_i
             
             if global_rank == 0 and global_step % 5000 == 0:
                 net.eval()
@@ -178,7 +209,7 @@ def main(cfg: DictConfig):
                 ckpt_path = f"checkpoints/lejepa_step_{global_step}.pth"
                 torch.save({
                     'epoch': epoch,
-                    'step': i,
+                    'step': true_i,
                     'model_state_dict': net.module.state_dict(),
                     'optimizer_state_dict': opt.state_dict(),
                     'scheduler_state_dict': scheduler.state_dict(),
