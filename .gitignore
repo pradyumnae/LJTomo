@@ -27,3 +27,18 @@ wandb/
 outputs/
 multirun/
 env/
+
+# Slurm logs
+slurm-*.out
+v2/slurm-*.out
+v2/lepav2_from_sratch/slurm-*.out
+v2/vit_large/slurm-*.out
+
+# PCA output directories
+v2/checkpoint_pca_*/
+v2/lepav2_from_sratch/checkpoint_pca_*/
+v2/vit_large/checkpoint_pca_*/
+checkpoint_pca_*/
+baseline_pca*/
+baseline_pca_more/
+
