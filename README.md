@@ -101,11 +101,12 @@ sbatch submit_watch.slurm
 
 Using the Low-Rank SVD PCA evaluator, high-contrast composite slices are exported dynamically to map similar microstructures to similar RGB channels. Here is how Step 14,000 compares to earlier stages:
 
-* Slices are saved under **[v2/checkpoint_pca_14000/](file:///global/homes/e/elavarpa/pscratch/lejepa_tomography/v2/checkpoint_pca_14000/)** (Seeds 42 and 999).
+* Slices are saved locally under `v2/checkpoint_pca_14000/` (Seeds 42 and 999).
 * High VRAM benchmarks confirm perfect scaling with **36.27 GB memory allocated per GPU** during training!
 
 ---
 
 ## 👥 Collaborating
 
-Feel free to fork this repository, submit Pull Requests, or raise issues. For full details on memory benchmarks, data loading exceptions, or the SIGReg custom objective function, please refer to the comprehensive **[v2/PROJECT_DETAILS.md](file:///global/homes/e/elavarpa/pscratch/lejepa_tomography/v2/PROJECT_DETAILS.md)**.
+Feel free to fork this repository, submit Pull Requests, or raise issues. For full details on memory benchmarks, data loading exceptions, or the SIGReg custom objective function, please refer to the comprehensive **[v2/PROJECT_DETAILS.md](v2/PROJECT_DETAILS.md)**.
+
