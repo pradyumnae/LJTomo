@@ -97,15 +97,25 @@ sbatch submit_watch.slurm
 
 ---
 
-## 📊 Visual Evaluation Results (Step 14,000)
+## 📊 Visual Evaluation & DINO Comparison (Step 14,000)
 
-Using the Low-Rank SVD PCA evaluator, high-contrast composite slices are exported dynamically to map similar microstructures to similar RGB channels. Here is how Step 14,000 compares to earlier stages:
 
+Using the Low-Rank SVD PCA evaluator, high-dimensional patch embeddings are projected dynamically to map similar microstructures to similar RGB composite channels. 
+
+### 1. DINO Pre-Trained Baseline (Step 0) vs. DINO-Trained LeJEPA (Step 14,000)
+A comparison of the PCA feature heatmaps reveals major domain-specific adaptation:
+* **DINO Pre-Trained Baseline (Step 0)**: 
+  * *Characteristics*: High spatial awareness of broad boundary geometries, but completely lacks wood anatomy context.
+  * *Failure Modes*: PCA mappings are extremely noisy. Pixels inside empty vessel lumens are frequently misclassified into the same color channel as high-density cell walls due to severe boundary effects. Ring and streak scanning artifacts are strongly visible in the representation maps.
+* **DINO-Trained LeJEPA (Step 14,000)**:
+  * *Characteristics*: Spectacular microstructural semantic clustering and domain expertise.
+  * *Successes*: Pixels corresponding to lignified cell walls map consistently to identical, clean, non-collapsing primary colors (e.g., sharp red channels), while background voids and vessel borders map strictly to distinct green/blue channels. Streak and ring artifacts are completely filtered out, and subtle material density variations are cleanly segmented.
+
+### 2. Live Outputs & Scaling
 * Slices are saved locally under `v2/checkpoint_pca_14000/` (Seeds 42 and 999).
 * High VRAM benchmarks confirm perfect scaling with **36.27 GB memory allocated per GPU** during training!
 
 ---
-
 ## 👥 Collaborating
 
 Feel free to fork this repository, submit Pull Requests, or raise issues. For full details on memory benchmarks, data loading exceptions, or the SIGReg custom objective function, please refer to the comprehensive **[v2/PROJECT_DETAILS.md](v2/PROJECT_DETAILS.md)**.
