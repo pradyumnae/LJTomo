@@ -24,11 +24,10 @@ class SIGReg(torch.nn.Module):
         return statistic.mean()
 
 class ViTEncoder(nn.Module):
-    def __init__(self, proj_dim=128, img_size=512, in_chans=1, pretrained=True):
+    def __init__(self, proj_dim=128, img_size=512, in_chans=1, pretrained=True, model_name="vit_large_patch14_dinov2"):
         super().__init__()
-        # vit_large_patch14_dinov2 is the premier ViT-Large model from Meta
         self.backbone = timm.create_model(
-            "vit_large_patch14_dinov2",
+            model_name,
             pretrained=pretrained,
             num_classes=1024,
             drop_path_rate=0.1,

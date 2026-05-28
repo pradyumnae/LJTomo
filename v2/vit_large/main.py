@@ -77,7 +77,7 @@ def main(cfg: DictConfig):
     # Pre-calculate steps per epoch
     steps_per_epoch = len(train_ds) // (cfg.bs * world_size)
 
-    net = ViTEncoder(proj_dim=cfg.proj_dim, img_size=cfg.img_size, in_chans=1, pretrained=cfg.pretrained).to("cuda")
+    net = ViTEncoder(proj_dim=cfg.proj_dim, img_size=cfg.img_size, in_chans=1, pretrained=cfg.pretrained, model_name=cfg.model_name).to("cuda")
     scaler = GradScaler(enabled=torch.cuda.is_available())
     
     # Auto-resume logic
@@ -235,7 +235,8 @@ if __name__ == "__main__":
         "bs": 2, # Conservative baseline batch size for ViT-L
         "num_workers": 4,
         "proj_dim": 128, "img_size": 512,
-        "lr": 1e-4, "epochs": 30, "lamb": 0.5
+        "lr": 1e-4, "epochs": 30, "lamb": 0.5,
+        "model_name": "vit_large_patch14_dinov2"
     })
     
     main(default_cfg)
