@@ -236,7 +236,7 @@ if __name__ == "__main__":
         "num_workers": 4,
         "proj_dim": 128, "img_size": 512,
         "lr": 1e-4, "epochs": 30, "lamb": 0.5,
-        "model_name": "vit_large_patch14_dinov2"
+        "model_name": "vit_large_patch16_dinov3"
     })
     
     main(default_cfg)
