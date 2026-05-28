@@ -111,7 +111,14 @@ A comparison of the PCA feature heatmaps reveals major domain-specific adaptatio
   * *Characteristics*: Spectacular microstructural semantic clustering and domain expertise.
   * *Successes*: Pixels corresponding to lignified cell walls map consistently to identical, clean, non-collapsing primary colors (e.g., sharp red channels), while background voids and vessel borders map strictly to distinct green/blue channels. Streak and ring artifacts are completely filtered out, and subtle material density variations are cleanly segmented.
 
-### 2. Live Outputs & Scaling
+### 2. Qualitative Visual Comparison
+Below is the exact qualitative shift showing how self-supervised tomography pre-training resolves anatomical structures and abstracts away scanner noise:
+
+| DINO Pre-Trained Baseline (Step 0) | DINO-Trained LeJEPA (Step 10,000) |
+|:---:|:---:|
+| ![DINO Baseline](v2/assets/baseline_dino.png) | ![Trained LeJEPA](v2/assets/trained_lejepa.png) |
+
+### 3. Live Outputs & Scaling
 * Slices are saved locally under `v2/checkpoint_pca_14000/` (Seeds 42 and 999).
 * High VRAM benchmarks confirm perfect scaling with **36.27 GB memory allocated per GPU** during training!
 

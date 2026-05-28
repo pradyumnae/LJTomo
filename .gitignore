@@ -42,3 +42,8 @@ checkpoint_pca_*/
 baseline_pca*/
 baseline_pca_more/
 
+# Whitelist visual assets for GitHub README frontpage
+!v2/assets/
+!v2/assets/*.png
+
+
