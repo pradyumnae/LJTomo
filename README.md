@@ -68,6 +68,25 @@ Raw datasets must be reconstructed and standard `.h5` files saved inside:
 
 ---
 
+## 🧬 Model Training Matrix & Initial Conditions
+
+LJTomo implements a modular architecture supporting multiple Vision Transformer (ViT) scales, pre-training backbones, and positional embedding methods. Below is the complete mapping of our training configurations and their current status:
+
+| Directory | Architecture | Pre-trained Backbone | Positional Embeddings | Initial Conditions | Current Progress | Scale / Hardware |
+| :--- | :--- | :--- | :--- | :--- | :---: | :--- |
+| **`v2/`** | ViT-Small (`patch16`) | DINOv3 | **RoPE** (Rotary) | DINOv3 Pre-trained Weights | **Step 20,000+** | 1 Node (4x A100 40GB) |
+| **`v2/lepav2_from_sratch/`** | ViT-Small (`patch16`) | DINOv3 | **RoPE** (Rotary) | Strictly From Scratch (Random Init) | **Step 14,000+** | 1 Node (4x A100 40GB) |
+| **`v2/vit_large/`** | ViT-Large (`patch14`) | DINOv2 | **Absolute** Position | DINOv2 Pre-trained Weights | **Step 54,000 (Completed)** | 2 Nodes (8x A100 40GB) |
+| **`v2/vit_large_dinov3/`** | ViT-Large (`patch16`) | DINOv3 | **RoPE** (Rotary) | DINOv3 Pre-trained Weights | **Queued / Active** | 2 Nodes (8x A100 40GB) |
+
+### 🛠️ Key Architectural Details
+
+* **RoPE (Rotary Position Embeddings)**: Enabled natively in all **DINOv3** models (`v2/`, `v2/lepav2_from_sratch/`, and `v2/vit_large_dinov3/`). RoPE preserves fine-grained, high-frequency spatial continuity, making it exceptionally suited for volumetric microstructural CT scans.
+* **Absolute Position Embeddings**: Enabled in the **DINOv2** baseline (`v2/vit_large/`), which serves as a highly robust comparative backbone.
+* **Separation Integrity**: To fully protect your **12-hour/40k step DINOv2 training run**, the DINOv2 and DINOv3 ViT-Large setups are placed in physically separate directories (`v2/vit_large/` vs. `v2/vit_large_dinov3/`), each with its own independent, isolated checkpoint directories.
+
+---
+
 ## 🏃 Launching Jobs
 
 ### 1-Node ViT-Small (4 GPUs)
